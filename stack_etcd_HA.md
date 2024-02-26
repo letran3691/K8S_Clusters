@@ -1,6 +1,4 @@
 config All node
-
-
     swapoff -a
     sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 
@@ -32,6 +30,8 @@ Packages install all nodes
     systemctl enable containerd
     systemctl status containerd
 
+#### Install k8s all nodes
+
     cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
     [kubernetes]
     name=Kubernetes
@@ -60,7 +60,9 @@ Packages install all nodes
     sysctl -p /etc/sysctl.d/99-sysctl.conf
     
     systemctl enable containerd kubelet
-    
+
+#### disable firewalld    
+
     systemctl stop firewalld
     systemctl disable firewalld
     systemctl mask firewalld
@@ -71,6 +73,9 @@ Packages install all nodes
     yum install haproxy keepalived -y
 
 ## on master01
+
+#### config keepalive
+
     vi /etc/keepalived/check_apiserver.sh
     
     #!/bin/sh
@@ -125,6 +130,7 @@ Packages install all nodes
         }
     }
 
+#### config haproxy
 
     cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg-org
 
@@ -153,7 +159,7 @@ Packages install all nodes
             server master03 10.84.4.122:6443 check
 
 
-#### copy config file haproxy and keepalive to master02 & 03 nodes
+#### copy config files haproxy and keepalive to master02 & 03 nodes
     for f in master02 master03; do scp /etc/keepalived/check_apiserver.sh /etc/keepalived/keepalived.conf root@$f:/etc/keepalived; scp /etc/haproxy/haproxy.cfg root@$f:/etc/haproxy; done
 
 #### On master02 & 03
