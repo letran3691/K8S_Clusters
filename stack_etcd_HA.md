@@ -1,8 +1,12 @@
+
+![img.png](img.png)
+
 config All node
+
     swapoff -a
     sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 
-add hosts all nodes
+add hosts all nodes (10.84.4.123 is VIP for master nodes)
 
     cat >> /etc/hosts << EOF
     10.84.4.120 master01
