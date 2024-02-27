@@ -1,3 +1,5 @@
+# Deploy on redhat 9
+
 
 ![img.png](img.png)
 
@@ -196,3 +198,10 @@ Packages install all nodes
 
     kubeadm join vip-k8s:8443 --token fxd5vd.kmtx7y9oeehg09gj \
             --discovery-token-ca-cert-hash sha256:d45bd1251af7bff8a036a7aa6b2c4d1a4a2bef59ec2346296d4f31fb9ac85b35
+
+#### deloy calico
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/master/manifests/calico.yaml
+
+
+
+
