@@ -1,3 +1,9 @@
+![img_2.png](images/img_2.png)
+
+#### Topology
+
+![img.png](images/img.png)
+
 #### add hosts
 
     cat >> /etc/hosts << EOF
@@ -39,15 +45,15 @@
       mv cfssljson_linux-amd64 /usr/local/bin/cfssljson
     }
 #### Create a Certificate Authority (CA)
-
-    mkdir CA_ETCD; cd CA_ETCD
-
     wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz
     sudo tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz
     export PATH=$PATH:/usr/local/go/bin
     export GOPATH=$HOME/go
-    
     source ~/.bash_profile; source ~/.bashrc;go version
+
+    mkdir CA_ETCD; cd CA_ETCD
+
+    curl -LO https://raw.githubusercontent.com/letran3691/K8S_Clusters/main/gent_cert.go
     go env -w GO111MODULE=auto
     go mod init root/CA_ETCD
     go mod tidy
@@ -140,7 +146,126 @@
       member list \
       -w=table
 
-##### On all master nodes
+### On all master nodes
+
+#### install on all master nodes
+
+    yum install haproxy keepalived -y
+
+#### on master01 config keepalive
+Note: change IP and network interface name
+
+    vi /etc/keepalived/check_apiserver.sh
+    
+    #!/bin/sh
+    APISERVER_VIP=10.84.4.123
+    APISERVER_DEST_PORT=6443
+    
+    errorExit() {
+        echo "*** $*" 1>&2
+        exit 1
+    }
+    
+    curl --silent --max-time 2 --insecure https://localhost:${APISERVER_DEST_PORT}/ -o /dev/null || errorExit "Error GET https://localhost:${APISERVER_DEST_PORT}/"
+    if ip addr | grep -q ${APISERVER_VIP}; then
+        curl --silent --max-time 2 --insecure https://${APISERVER_VIP}:${APISERVER_DEST_PORT}/ -o /dev/null || errorExit "Error GET https://${APISERVER_VIP}:${APISERVER_DEST_PORT}/"
+    fi
+
+    chmod +x /etc/keepalived/check_apiserver.sh
+
+    cp /etc/keepalived/keepalived.conf /etc/keepalived/keepalived.conf-org
+
+        
+    sh -c '> /etc/keepalived/keepalived.conf'
+    vi /etc/keepalived/keepalived.conf
+    
+    ! /etc/keepalived/keepalived.conf
+    ! Configuration File for keepalived
+    global_defs {
+        router_id LVS_DEVEL
+    }
+    vrrp_script check_apiserver {
+      script "/etc/keepalived/check_apiserver.sh"
+      interval 3
+      weight -2
+      fall 10
+      rise 2
+    }
+    
+    vrrp_instance VI_1 {
+        state MASTER
+        interface ens192
+        virtual_router_id 151
+        priority 255
+        authentication {
+            auth_type PASS
+            auth_pass 8dasdsa8Aq@
+        }
+        virtual_ipaddress {
+            10.84.4.123/24
+        }
+        track_script {
+            check_apiserver
+        }
+    }
+
+#### config haproxy
+
+    cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg-org
+
+### Note: remove config forntend, backend for example
+
+    vi /etc/haproxy/haproxy.cfg
+    #---------------------------------------------------------------------
+    # apiserver frontend which proxys to the masters
+    #---------------------------------------------------------------------
+    frontend apiserver
+        bind *:8443
+        mode tcp
+        option tcplog
+        default_backend apiserver
+    #---------------------------------------------------------------------
+    # round robin balancing for apiserver
+    #---------------------------------------------------------------------
+    backend apiserver
+        option httpchk GET /healthz
+        http-check expect status 200
+        mode tcp
+        option ssl-hello-chk
+        balance     roundrobin
+            server master01 10.84.4.120:6443 check
+            server master02 10.84.4.121:6443 check
+            server master03 10.84.4.122:6443 check
+    #---------------------------------------------------------------------
+    # round robin balancing for nodeports
+    #---------------------------------------------------------------------
+    frontend nodeport-frontend
+      bind *:30000-32767
+      mode tcp
+      option tcplog
+      timeout client 10s
+      default_backend nodeport-backend
+    
+    backend nodeport-backend
+      mode tcp
+      timeout connect 10s
+      timeout server 10s
+      balance roundrobin
+    
+      server master01 10.84.4.120
+      server master02 10.84.4.121
+      server master03 10.84.4.122
+
+
+#### copy config files haproxy and keepalive to master02 & 03 nodes
+    for f in master02 master03; do scp /etc/keepalived/check_apiserver.sh /etc/keepalived/keepalived.conf root@$f:/etc/keepalived; scp /etc/haproxy/haproxy.cfg root@$f:/etc/haproxy; done
+
+#### On master02 & 03
+
+#### Note: Only two parameters of this file need to be changed for master-2 & 3 nodes. State will become SLAVE for master 2 and 3, priority will be 254 and 253 respectively.
+
+    systemctl enable keepalived --now
+    systemctl enable haproxy --now
 
     mkdir -vp /etcd/kubernetes/pki/etcd/
 

@@ -1,7 +1,7 @@
-# Deploy on redhat 9
+![img.png](images/img3.png)
 
 
-![img.png](img.png)
+![img_1.png](images/img_1.png)
 
 config All node
 
@@ -163,7 +163,25 @@ Packages install all nodes
             server master01 10.84.4.120:6443 check
             server master02 10.84.4.121:6443 check
             server master03 10.84.4.122:6443 check
-
+    #---------------------------------------------------------------------
+    # round robin balancing for nodeports
+    #---------------------------------------------------------------------
+    frontend nodeport-frontend
+      bind *:30000-32767
+      mode tcp
+      option tcplog
+      timeout client 10s
+      default_backend nodeport-backend
+    
+    backend nodeport-backend
+      mode tcp
+      timeout connect 10s
+      timeout server 10s
+      balance roundrobin
+    
+      server master01 10.84.4.120
+      server master02 10.84.4.121
+      server master03 10.84.4.122
 
 #### copy config files haproxy and keepalive to master02 & 03 nodes
     for f in master02 master03; do scp /etc/keepalived/check_apiserver.sh /etc/keepalived/keepalived.conf root@$f:/etc/keepalived; scp /etc/haproxy/haproxy.cfg root@$f:/etc/haproxy; done
