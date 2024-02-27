@@ -335,3 +335,6 @@ Note: change IP and network interface name
     
     EOF
     }
+
+#### deloy calico
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/master/manifests/calico.yaml
