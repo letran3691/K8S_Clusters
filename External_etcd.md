@@ -53,6 +53,24 @@
 
     mkdir CA_ETCD; cd CA_ETCD
 
+### There are 2 methods you can create them
+#### Manual gent cert
+
+Note: you can change cert expiration with parameter "-days"
+
+    cd openssl
+    openssl genrsa -out ca-key.pem 2048
+    openssl req -new -key ca-key.pem -out ca-csr.pem -subj "/CN=etcd cluster"
+    openssl x509 -req -in ca-csr.pem -out ca.pem -days 3650 -signkey ca-key.pem -sha256
+    openssl genrsa -out etcd-key.pem 2048
+    openssl req -new -key etcd-key.pem -out etcd-csr.pem -subj "/CN=etcd"
+    
+    echo subjectAltName = DNS:localhost,IP:192.168.1.2,IP:192.168.1.3,IP:192.168.1.4,IP:127.0.0.1 > extfile.cnf
+    openssl x509 -req -in etcd-csr.pem -CA ca.pem -CAkey ca-key.pem -CAcreateserial -days 3650 -out etcd.pem -sha256 -extfile extfile.cnf
+ 
+#### Auto gent cert
+Note: cert expiration after 10 years
+
     curl -LO https://raw.githubusercontent.com/letran3691/K8S_Clusters/main/gent_cert.go
     go env -w GO111MODULE=auto
     go mod init root/CA_ETCD
@@ -88,10 +106,13 @@
     ETCD3_IP="10.84.4.126"
 
     cat <<EOF >/etc/etcd/etcd.conf
+    #[member]
     ETCD_NAME=${ETCD_NAME}
-    ETCD_INITIAL_ADVERTISE_PEER_URLS="https://${NODE_IP}:2380"
+    ETCD_DATA_DIR="/var/lib/etcd/data"
     ETCD_LISTEN_PEER_URLS="https://${NODE_IP}:2380"
     ETCD_LISTEN_CLIENT_URLS="https://${NODE_IP}:2379,https://127.0.0.1:2379"
+    #[cluster]
+    ETCD_INITIAL_ADVERTISE_PEER_URLS="https://${NODE_IP}:2380"
     ETCD_ADVERTISE_CLIENT_URLS="https://${NODE_IP}:2379"
     ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
     ETCD_INITIAL_CLUSTER="etcd01=https://${ETCD1_IP}:2380,etcd02=https://${ETCD2_IP},etcd03=https://${ETCD3_IP}:2380"
@@ -100,6 +121,7 @@
     ETCD_PEER_AUTO_TLS
     ETCD_SNAPSHOT_COUNT="10000"
     ETCD_WAL_DIR="/var/lib/etcd/wal"
+    #[ssl]
     ETCD_CLIENT_CERT_AUTH
     ETCD_TRUSTED_CA_FILE="/var/lib/etcd/ca.pem"
     ETCD_CERT_FILE="/var/lib/etcd/etcd.pem"
@@ -108,8 +130,6 @@
     ETCD_PEER_TRUSTED_CA_FILE="/var/lib/etcd/ca.pem"
     ETCD_PEER_KEY_FILE="/var/lib/etcd/etcd-key.pem"
     ETCD_PEER_CERT_FILE="/var/lib/etcd/etcd.pem"
-    ETCD_DATA_DIR="/var/lib/etcd/data"
-    
     EOF
 
     cat <<EOF >/etc/systemd/system/etcd.service
@@ -338,3 +358,7 @@ Note: change IP and network interface name
 
 #### deloy calico
     kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/master/manifests/calico.yaml
+
+#### On master nodes check ectd cluster status (need install etcd on master nodes)
+
+    etcdctl --cacert=/etcd/kubernetes/pki/etcd/ca.pem --cert=/etcd/kubernetes/pki/etcd/etcd.pem --key=/etcd/kubernetes/pki/etcd/etcd-key.pem  --endpoints=https://10.84.4.124:2379 endpoint --cluster status -w table
