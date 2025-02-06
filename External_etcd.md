@@ -65,7 +65,7 @@ Note: you can change cert expiration with parameter "-days"
     openssl genrsa -out etcd-key.pem 2048
     openssl req -new -key etcd-key.pem -out etcd-csr.pem -subj "/CN=etcd"
     
-    echo subjectAltName = DNS:localhost,IP:192.168.1.2,IP:192.168.1.3,IP:192.168.1.4,IP:127.0.0.1 > extfile.cnf
+    echo subjectAltName = DNS:localhost,IP:10.84.4.124,IP:10.84.4.125,IP:10.84.4.126,IP:127.0.0.1 > extfile.cnf
     openssl x509 -req -in etcd-csr.pem -CA ca.pem -CAkey ca-key.pem -CAcreateserial -days 3650 -out etcd.pem -sha256 -extfile extfile.cnf
  
 #### Auto gent cert
@@ -130,6 +130,11 @@ Note: cert expiration after 10 years
     ETCD_PEER_TRUSTED_CA_FILE="/var/lib/etcd/ca.pem"
     ETCD_PEER_KEY_FILE="/var/lib/etcd/etcd-key.pem"
     ETCD_PEER_CERT_FILE="/var/lib/etcd/etcd.pem"
+    ETCD_HEARTBEAT_INTERVAL="200"
+    ETCD_ELECTION_TIMEOUT="2000"
+    ETCD_LOGGER="zap"
+    ETCD_QUOTA_BACKEND_BYTES="8589934592"
+
     EOF
 
     cat <<EOF >/etc/systemd/system/etcd.service
